@@ -1,28 +1,35 @@
 """Integration tests for event API endpoints."""
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
+from app.db import engine, Base
+
+
+@pytest.fixture(autouse=True)
+def clean_db():
+    """Drop and recreate all tables before each test for a clean slate."""
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
 
 
 def _client():
-    # Use per-test client context to avoid leakage across tests.
     return TestClient(app)
 
 
 def test_health():
-    """Test health check endpoint."""
     with _client() as client:
         response = client.get("/health")
     assert response.status_code == 200
-    body = response.json()
-    assert body["status"] == "ok"
+    assert response.json()["status"] == "ok"
 
 
 def test_create_event():
-    """Test creating a new event."""
     payload = {"event_type": "signup", "user_id": "123"}
     with _client() as client:
         response = client.post("/events", json=payload)
-
     assert response.status_code == 201
     data = response.json()
     assert data["event_type"] == payload["event_type"]
@@ -62,14 +69,11 @@ def test_create_event_wrong_types():
 
 
 def test_get_event_flow():
-    """Test creating and retrieving an event."""
     with _client() as client:
         created = client.post("/events", json={"event_type": "login", "user_id": "456"})
         assert created.status_code == 201
         event_id = created.json()["id"]
-
         response = client.get(f"/events/{event_id}")
-
     assert response.status_code == 200
     body = response.json()
     assert body["id"] == event_id
@@ -89,9 +93,7 @@ def test_list_events_contains_created_item():
         created = client.post("/events", json={"event_type": "list_test", "user_id": "u1"})
         assert created.status_code == 201
         created_id = created.json()["id"]
-
         response = client.get("/events")
-
     assert response.status_code == 200
     items = response.json()
     assert isinstance(items, list)
@@ -103,10 +105,8 @@ def test_delete_event():
         created = client.post("/events", json={"event_type": "delete_test", "user_id": "789"})
         assert created.status_code == 201
         event_id = created.json()["id"]
-
         deleted = client.delete(f"/events/{event_id}")
         fetched = client.get(f"/events/{event_id}")
-
     assert deleted.status_code == 204
     assert fetched.status_code == 404
 
