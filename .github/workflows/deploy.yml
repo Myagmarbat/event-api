@@ -48,6 +48,8 @@ jobs:
     environment: stage
     permissions:
       contents: read
+    env:
+      IMAGE_REF: ${{ secrets.DOCR_REGISTRY }}/${{ github.event.repository.name }}:${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,7 +84,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: APP_DIR,DO_API_TOKEN,DATABASE_URL,DO_DB_CA_CERT
+          envs: APP_DIR,DO_API_TOKEN,DATABASE_URL,DO_DB_CA_CERT,IMAGE_REF
           script: |
             set -euo pipefail
             mkdir -p "$APP_DIR"
@@ -93,9 +95,9 @@ jobs:
               CA_FILE="$(mktemp)"
               printf '%s\n' "$DO_DB_CA_CERT" > "$CA_FILE"
               chmod 600 "$CA_FILE"
-              DB_SSL_CA="$CA_FILE" APP_DIR="$APP_DIR" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh '${{ github.sha }}'
+              DB_SSL_CA="$CA_FILE" APP_DIR="$APP_DIR" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh "$IMAGE_REF"
             else
-              APP_DIR="$APP_DIR" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh '${{ github.sha }}'
+              APP_DIR="$APP_DIR" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh "$IMAGE_REF"
             fi
 
   stage-integration-tests:
@@ -127,6 +129,8 @@ jobs:
     environment: production
     permissions:
       contents: read
+    env:
+      IMAGE_REF: ${{ secrets.DOCR_REGISTRY }}/${{ github.event.repository.name }}:${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -161,7 +165,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: APP_DIR,DO_API_TOKEN,DATABASE_URL,DO_DB_CA_CERT
+          envs: APP_DIR,DO_API_TOKEN,DATABASE_URL,DO_DB_CA_CERT,IMAGE_REF
           script: |
             set -euo pipefail
             mkdir -p "$APP_DIR"
@@ -172,7 +176,7 @@ jobs:
               CA_FILE="$(mktemp)"
               printf '%s\n' "$DO_DB_CA_CERT" > "$CA_FILE"
               chmod 600 "$CA_FILE"
-              DB_SSL_CA="$CA_FILE" APP_DIR="$APP_DIR" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh '${{ github.sha }}'
+              DB_SSL_CA="$CA_FILE" APP_DIR="$APP_DIR" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh "$IMAGE_REF"
             else
-              APP_DIR="$APP_DIR" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh '${{ github.sha }}'
+              APP_DIR="$APP_DIR" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh "$IMAGE_REF"
             fi
