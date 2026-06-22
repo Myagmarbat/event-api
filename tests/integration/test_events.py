@@ -1,4 +1,5 @@
 """Integration tests for event API endpoints."""
+
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -90,7 +91,9 @@ def test_get_event_not_found():
 
 def test_list_events_contains_created_item():
     with _client() as client:
-        created = client.post("/events", json={"event_type": "list_test", "user_id": "u1"})
+        created = client.post(
+            "/events", json={"event_type": "list_test", "user_id": "u1"}
+        )
         assert created.status_code == 201
         created_id = created.json()["id"]
         response = client.get("/events")
@@ -102,7 +105,9 @@ def test_list_events_contains_created_item():
 
 def test_delete_event():
     with _client() as client:
-        created = client.post("/events", json={"event_type": "delete_test", "user_id": "789"})
+        created = client.post(
+            "/events", json={"event_type": "delete_test", "user_id": "789"}
+        )
         assert created.status_code == 201
         event_id = created.json()["id"]
         deleted = client.delete(f"/events/{event_id}")
