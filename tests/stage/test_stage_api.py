@@ -14,7 +14,8 @@ def _base_url() -> str:
     return value.rstrip("/")
 
 
-def _wait_for_health(timeout_seconds: int = 180, interval_seconds: int = 5) -> httpx.Response:
+def _wait_for_health(timeout_seconds: int = 180, interval_seconds: int = 5) \
+        -> httpx.Response:
     deadline = time.monotonic() + timeout_seconds
     last_error: Exception | None = None
 
