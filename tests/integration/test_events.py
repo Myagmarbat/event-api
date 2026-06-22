@@ -19,11 +19,11 @@ def clean_db():
     """Drop and recreate all tables before each test for a clean slate."""
     logger.info("Setting up test database...")
     init_engine()
-    Base.metadata.drop_all(bind=_db.engine)
+    Base.metadata.drop_all(bind=_db.engine, checkfirst=True)
     Base.metadata.create_all(bind=_db.engine)
     yield
     logger.info("Tearing down test database...")
-    Base.metadata.drop_all(bind=_db.engine)
+    Base.metadata.drop_all(bind=_db.engine, checkfirst=True)
     Base.metadata.create_all(bind=_db.engine)
 
 
