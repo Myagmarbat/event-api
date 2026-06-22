@@ -17,7 +17,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
       - name: Ruff
-        run: ruff check .
+        run: ruff check .ruff check .
       - name: Black
         run: black --check .
 
@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: unit-tests
     env:
-      DATABASE_URL: ${{ secrets.INTEGRATION_DATABASE_URL }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
       PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [unit-tests, integration-tests]
     env:
-      DATABASE_URL: ${{ secrets.INTEGRATION_DATABASE_URL }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
       PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
