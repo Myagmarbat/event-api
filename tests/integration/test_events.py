@@ -1,4 +1,5 @@
 """Integration tests for event API endpoints."""
+
 import logging
 import pytest
 from dotenv import load_dotenv
@@ -52,5 +53,6 @@ def test_create_event():
     assert "id" in data
     assert "created_at" in data
     logger.info(f"Created event: {data['id']}")
+
 
 # ... rest of tests unchanged

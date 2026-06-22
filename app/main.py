@@ -1,4 +1,5 @@
 """FastAPI application with event CRUD endpoints."""
+
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import uuid
@@ -18,6 +19,7 @@ app = FastAPI(
 def startup():
     init_engine()
     import app.db as _db
+
     Base.metadata.create_all(bind=_db.engine)
 
 
