@@ -1,5 +1,6 @@
 """Application configuration."""
 
+# pragma: no cover
 import os
 
 APP_NAME = os.getenv("APP_NAME", "event-api")

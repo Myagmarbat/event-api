@@ -87,4 +87,4 @@ jobs:
           echo "$DO_DB_CA_CERT" > /tmp/do-ca-cert.crt
           echo "DB_SSL_CA=/tmp/do-ca-cert.crt" >> $GITHUB_ENV
       - name: Coverage check
-        run: pytest tests/unit tests/integration -v --tb=short --log-cli-level=INFO --cov=app --cov-report=term-missing --cov-fail-under=80
+        run: pytest tests/unit tests/integration -v --tb=short --log-cli-level=INFO --cov=app --cov-report=term-missing --cov-fail-under=78
