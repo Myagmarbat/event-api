@@ -40,6 +40,7 @@ pip install -r requirements.txt
 ```bash
 export DATABASE_URL="postgresql://user:password@localhost:5432/event_db"
 export APP_NAME="event-api"
+
 ```
 
 ## Running the Application
