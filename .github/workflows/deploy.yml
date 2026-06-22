@@ -1,0 +1,68 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    env:
+      IMAGE_SHA: ${{ secrets.DOCR_REGISTRY }}/${{ github.event.repository.name }}:${{ github.sha }}
+      IMAGE_LATEST: ${{ secrets.DOCR_REGISTRY }}/${{ github.event.repository.name }}:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DO_API_TOKEN }}
+
+      - name: Authenticate to DOCR
+        run: doctl registry login --expiry-seconds 1200
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t "$IMAGE_SHA" \
+            -t "$IMAGE_LATEST" \
+            .
+
+      - name: Push Docker image
+        run: |
+          docker push "$IMAGE_SHA"
+          docker push "$IMAGE_LATEST"
+
+      - name: Deploy on Droplet
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          APP_DIR: ${{ secrets.APP_DIR }}
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          IMAGE_TAG: ${{ env.IMAGE_SHA }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: APP_DIR,DO_API_TOKEN,IMAGE_TAG
+          script: |
+            set -euo pipefail
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
+
+            if [ ! -f "./docker-compose.yml" ] || [ ! -f "./deploy.sh" ]; then
+              echo "Missing docker-compose.yml or deploy.sh in $APP_DIR."
+              echo "Bootstrap the server with the repository deployment files before the first deploy."
+              exit 1
+            fi
+
+            chmod +x ./deploy.sh
+            APP_DIR="$APP_DIR" IMAGE_TAG="$IMAGE_TAG" DO_API_TOKEN="$DO_API_TOKEN" ./deploy.sh

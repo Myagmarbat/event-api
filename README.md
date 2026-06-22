@@ -48,6 +48,7 @@ export APP_NAME="event-api"
 ### Locally
 
 ```bash
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
@@ -58,7 +59,7 @@ The API will be available at `http://127.0.0.1:8000`
 
 ```bash
 docker build -t event-api .
-docker run -e DATABASE_URL="postgresql://..." -p 8000:8080 event-api
+docker run -e DATABASE_URL="postgresql://..." -p 8000:8000 event-api
 ```
 
 ## API Endpoints
@@ -110,6 +111,12 @@ The API returns appropriate HTTP status codes:
 
 - `DATABASE_URL` (required): PostgreSQL connection string
 - `APP_NAME` (optional): Application name (default: "event-api")
+- `IMAGE` (deployment only): container image reference used by `docker compose`
+
+## Deployment
+
+Production deployment automation for DigitalOcean is documented in
+[`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## Project Structure
 

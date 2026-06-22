@@ -12,4 +12,4 @@ COPY . .
 #   docker run -v /path/to/ca-cert.crt:/run/secrets/do-ca-cert.crt \
 #              -e DB_SSL_CA=/run/secrets/do-ca-cert.crt \
 #              -e DATABASE_URL=postgresql://... ...
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
