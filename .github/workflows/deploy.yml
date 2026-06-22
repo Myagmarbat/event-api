@@ -55,6 +55,28 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare app dir
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -euo pipefail
+            mkdir -p "${{ secrets.APP_DIR }}"
+
+      - name: Sync deployment files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: docker-compose.yml,deploy.sh
+          target: ${{ secrets.APP_DIR }}
+
       - name: Deploy stage droplet
         uses: appleboy/ssh-action@v1.2.5
         env:
@@ -67,26 +89,21 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: APP_DIR,DO_API_TOKEN,IMAGE_TAG,DATABASE_URL,DO_DB_CA_CERT
+          envs: APP_DIR,DO_API_TOKEN,DATABASE_URL,DO_DB_CA_CERT
           script: |
             set -euo pipefail
+            IMAGE_TAG='${{ needs.build-and-push.outputs.image_sha }}'
             mkdir -p "$APP_DIR"
             cd "$APP_DIR"
-
-            if [ ! -f "./docker-compose.yml" ] || [ ! -f "./deploy.sh" ]; then
-              echo "Missing docker-compose.yml or deploy.sh in $APP_DIR."
-              echo "Bootstrap the server with the repository deployment files before the first deploy."
-              exit 1
-            fi
 
             chmod +x ./deploy.sh
             if [ -n "$DO_DB_CA_CERT" ]; then
               CA_FILE="$(mktemp)"
               printf '%s\n' "$DO_DB_CA_CERT" > "$CA_FILE"
               chmod 600 "$CA_FILE"
-              DB_SSL_CA="$CA_FILE" APP_DIR="$APP_DIR" IMAGE_TAG="$IMAGE_TAG" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh
+              DB_SSL_CA="$CA_FILE" APP_DIR="$APP_DIR" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh '${{ needs.build-and-push.outputs.image_sha }}'
             else
-              APP_DIR="$APP_DIR" IMAGE_TAG="$IMAGE_TAG" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh
+              APP_DIR="$APP_DIR" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh '${{ needs.build-and-push.outputs.image_sha }}'
             fi
 
   stage-integration-tests:
@@ -119,6 +136,28 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare app dir
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -euo pipefail
+            mkdir -p "${{ secrets.APP_DIR }}"
+
+      - name: Sync deployment files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: docker-compose.yml,deploy.sh
+          target: ${{ secrets.APP_DIR }}
+
       - name: Deploy production droplet
         uses: appleboy/ssh-action@v1.2.5
         env:
@@ -131,24 +170,19 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: APP_DIR,DO_API_TOKEN,IMAGE_TAG,DATABASE_URL,DO_DB_CA_CERT
+          envs: APP_DIR,DO_API_TOKEN,DATABASE_URL,DO_DB_CA_CERT
           script: |
             set -euo pipefail
+            IMAGE_TAG='${{ needs.build-and-push.outputs.image_sha }}'
             mkdir -p "$APP_DIR"
             cd "$APP_DIR"
-
-            if [ ! -f "./docker-compose.yml" ] || [ ! -f "./deploy.sh" ]; then
-              echo "Missing docker-compose.yml or deploy.sh in $APP_DIR."
-              echo "Bootstrap the server with the repository deployment files before the first deploy."
-              exit 1
-            fi
 
             chmod +x ./deploy.sh
             if [ -n "$DO_DB_CA_CERT" ]; then
               CA_FILE="$(mktemp)"
               printf '%s\n' "$DO_DB_CA_CERT" > "$CA_FILE"
               chmod 600 "$CA_FILE"
-              DB_SSL_CA="$CA_FILE" APP_DIR="$APP_DIR" IMAGE_TAG="$IMAGE_TAG" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh
+              DB_SSL_CA="$CA_FILE" APP_DIR="$APP_DIR" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh '${{ needs.build-and-push.outputs.image_sha }}'
             else
-              APP_DIR="$APP_DIR" IMAGE_TAG="$IMAGE_TAG" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh
+              APP_DIR="$APP_DIR" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh '${{ needs.build-and-push.outputs.image_sha }}'
             fi
