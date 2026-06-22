@@ -3,12 +3,13 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
+COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-/dev/null}"
 SERVICE_NAME="${SERVICE_NAME:-api}"
-ENV_FILE="${ENV_FILE:-.env}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1/health}"
-HEALTH_RETRIES="${HEALTH_RETRIES:-20}"
+HEALTH_RETRIES="${HEALTH_RETRIES:-30}"
 HEALTH_SLEEP_SECONDS="${HEALTH_SLEEP_SECONDS:-3}"
 TARGET_IMAGE="${IMAGE_TAG:-${IMAGE:-}}"
+PREVIOUS_IMAGE=""
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -21,35 +22,28 @@ wait_for_health() {
   local attempt
   for attempt in $(seq 1 "$HEALTH_RETRIES"); do
     if curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
+      echo "Health check passed."
       return 0
     fi
+    echo "Health check attempt ${attempt}/${HEALTH_RETRIES} failed."
     sleep "$HEALTH_SLEEP_SECONDS"
   done
   return 1
 }
 
-set_env_var() {
-  local key="$1"
-  local value="$2"
-  local file="$3"
-
-  if grep -q "^${key}=" "$file"; then
-    sed -i "s|^${key}=.*|${key}=${value}|" "$file"
-  else
-    printf '%s=%s\n' "$key" "$value" >>"$file"
-  fi
+compose() {
+  docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
 
 rollback() {
-  if [ ! -f "${ENV_FILE}.rollback" ]; then
-    echo "No rollback state available."
+  if [ -z "$PREVIOUS_IMAGE" ]; then
+    echo "No previous image available for rollback."
     return 1
   fi
 
-  echo "Rolling back to previous deployment state..."
-  mv "${ENV_FILE}.rollback" "$ENV_FILE"
+  echo "Rolling back to previous image: $PREVIOUS_IMAGE"
 
-  if ! docker compose -f "$COMPOSE_FILE" up -d "$SERVICE_NAME"; then
+  if ! IMAGE="$PREVIOUS_IMAGE" compose up -d "$SERVICE_NAME"; then
     echo "Rollback restart failed."
     return 1
   fi
@@ -78,13 +72,8 @@ if [ ! -f "$COMPOSE_FILE" ]; then
   exit 1
 fi
 
-if [ ! -f "$ENV_FILE" ]; then
-  echo "Missing environment file: $APP_DIR/$ENV_FILE"
-  exit 1
-fi
-
-if ! grep -q '^DATABASE_URL=' "$ENV_FILE"; then
-  echo "DATABASE_URL must be defined in $ENV_FILE"
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "DATABASE_URL must be provided to deploy.sh"
   exit 1
 fi
 
@@ -93,17 +82,25 @@ if [ -z "$TARGET_IMAGE" ]; then
   exit 1
 fi
 
+echo "Deploying $TARGET_IMAGE to $SERVICE_NAME in $APP_DIR"
+PREVIOUS_CONTAINER="$(compose ps -q "$SERVICE_NAME" 2>/dev/null || true)"
+if [ -n "$PREVIOUS_CONTAINER" ]; then
+  PREVIOUS_IMAGE="$(docker inspect --format '{{.Config.Image}}' "$PREVIOUS_CONTAINER" 2>/dev/null || true)"
+fi
+
+if [ -n "$PREVIOUS_IMAGE" ]; then
+  echo "Previous image: $PREVIOUS_IMAGE"
+else
+  echo "No existing container found for rollback."
+fi
+
 if [ -n "${DO_API_TOKEN:-}" ]; then
   echo "$DO_API_TOKEN" | docker login registry.digitalocean.com -u doctl --password-stdin
 fi
 
-cp "$ENV_FILE" "${ENV_FILE}.rollback"
-set_env_var IMAGE "$TARGET_IMAGE" "$ENV_FILE"
-
-if docker compose -f "$COMPOSE_FILE" pull "$SERVICE_NAME" &&
-  docker compose -f "$COMPOSE_FILE" up -d "$SERVICE_NAME" &&
+if IMAGE="$TARGET_IMAGE" compose pull "$SERVICE_NAME" &&
+  IMAGE="$TARGET_IMAGE" compose up -d "$SERVICE_NAME" &&
   wait_for_health; then
-  rm -f "${ENV_FILE}.rollback"
   docker image prune -f >/dev/null 2>&1 || true
   echo "Deployment successful."
   exit 0

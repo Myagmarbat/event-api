@@ -17,6 +17,8 @@ environment secrets in both environments, with values for the matching Droplet:
 - `SSH_USER` - SSH user on the droplet
 - `SSH_KEY` - private key for the SSH user
 - `APP_DIR` - deployment directory on the droplet, for example `/opt/event-api`
+- `DATABASE_URL` - Managed PostgreSQL connection string for that environment,
+  for example `postgresql://...:25060/event_db?sslmode=require`
 
 Store this additional environment secret in `stage`:
 
@@ -52,17 +54,11 @@ Install these packages on the server before the first deployment:
    ssh your-user@your-host 'chmod +x /opt/event-api/deploy.sh'
    ```
 
-3. Create `/opt/event-api/.env` on each droplet:
-
-   ```env
-   DATABASE_URL=******host:25060/event_db?sslmode=require
-   IMAGE=registry.digitalocean.com/my-registry/event-api:latest
-   ```
-
-   `docker-compose.yml` reads `DATABASE_URL` and `IMAGE` from this file. Stage
-   and production should point at separate Managed PostgreSQL databases. Future
-   deployments only update the `IMAGE` value; each droplet remains the source of
-   truth for its own `DATABASE_URL`.
+3. Do not create `/opt/event-api/.env`. The deploy workflow passes
+   `DATABASE_URL` from GitHub Environment secrets directly to `deploy.sh`, and
+   `docker-compose.yml` passes it to the container as a runtime environment
+   variable. Stage and production should use separate `DATABASE_URL` secret
+   values.
 
 ## Continuous deployment flow
 
@@ -77,11 +73,12 @@ Install these packages on the server before the first deployment:
 8. The `production` environment approval gate pauses the workflow.
 9. After approval, the workflow deploys the same image SHA to the production
    Droplet.
-10. `deploy.sh` updates the `IMAGE` entry in `.env`, pulls the new image,
+10. The workflow passes GitHub Environment secrets over SSH as runtime
+    environment variables, then `deploy.sh` verifies them, pulls the new image,
     restarts the `api` service with `docker compose`, and retries
     `curl http://127.0.0.1/health`.
-11. If the health check never succeeds, `deploy.sh` restores the previous `.env`
-    state, restarts the old container, and exits non-zero so the workflow fails.
+11. If the health check never succeeds, `deploy.sh` restarts the previous image
+    and exits non-zero so the workflow fails.
 
 ## Notes
 

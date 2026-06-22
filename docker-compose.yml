@@ -1,10 +1,12 @@
 services:
   api:
-    image: ${IMAGE:?set IMAGE in .env}
+    image: ${IMAGE:?set IMAGE}
     container_name: event-api
     restart: always
-    env_file:
-      - .env
+    environment:
+      APP_NAME: ${APP_NAME:-event-api}
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      DB_SSL_CA: ${DB_SSL_CA:-}
     ports:
       - "80:8000"
     healthcheck:

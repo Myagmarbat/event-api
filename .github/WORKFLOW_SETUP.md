@@ -34,8 +34,9 @@ verification, and staged DigitalOcean deployments.
 - **Secrets required:**
   - Repository: `DOCR_REGISTRY`, `DO_API_TOKEN`
   - `stage` environment: `SSH_HOST`, `SSH_USER`, `SSH_KEY`, `APP_DIR`,
-    `STAGE_BASE_URL`
-  - `production` environment: `SSH_HOST`, `SSH_USER`, `SSH_KEY`, `APP_DIR`
+    `DATABASE_URL`, `STAGE_BASE_URL`
+  - `production` environment: `SSH_HOST`, `SSH_USER`, `SSH_KEY`, `APP_DIR`,
+    `DATABASE_URL`
 
 ## Setup Instructions
 
@@ -60,6 +61,7 @@ Add these environment secrets to both:
 | `SSH_USER` | SSH username | e.g., `deploy` |
 | `SSH_KEY` | Private SSH key | Multiline private key |
 | `APP_DIR` | App directory | e.g., `/opt/event-api` |
+| `DATABASE_URL` | Managed Postgres URL | Environment-specific |
 
 Add this only to `stage`:
 
@@ -98,12 +100,8 @@ sudo chown $USER:$USER /opt/event-api
 # Copy deployment files from this repository
 scp docker-compose.yml deploy.sh user@server:/opt/event-api/
 
-# Create and configure environment
-nano .env
-
-# Required values:
-# DATABASE_URL=postgresql://...
-# IMAGE=registry.digitalocean.com/my-registry/event-api:latest
+# Do not create /opt/event-api/.env. The deploy workflow passes GitHub
+# Environment secrets directly to deploy.sh and docker compose.
 ```
 
 ## Workflow Triggers

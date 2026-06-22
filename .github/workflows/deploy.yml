@@ -61,11 +61,13 @@ jobs:
           APP_DIR: ${{ secrets.APP_DIR }}
           DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image_sha }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DO_DB_CA_CERT: ${{ secrets.DO_DB_CA_CERT }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: APP_DIR,DO_API_TOKEN,IMAGE_TAG
+          envs: APP_DIR,DO_API_TOKEN,IMAGE_TAG,DATABASE_URL,DO_DB_CA_CERT
           script: |
             set -euo pipefail
             mkdir -p "$APP_DIR"
@@ -78,7 +80,14 @@ jobs:
             fi
 
             chmod +x ./deploy.sh
-            APP_DIR="$APP_DIR" IMAGE_TAG="$IMAGE_TAG" DO_API_TOKEN="$DO_API_TOKEN" ./deploy.sh
+            if [ -n "$DO_DB_CA_CERT" ]; then
+              CA_FILE="$(mktemp)"
+              printf '%s\n' "$DO_DB_CA_CERT" > "$CA_FILE"
+              chmod 600 "$CA_FILE"
+              DB_SSL_CA="$CA_FILE" APP_DIR="$APP_DIR" IMAGE_TAG="$IMAGE_TAG" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh
+            else
+              APP_DIR="$APP_DIR" IMAGE_TAG="$IMAGE_TAG" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh
+            fi
 
   stage-integration-tests:
     runs-on: ubuntu-latest
@@ -116,11 +125,13 @@ jobs:
           APP_DIR: ${{ secrets.APP_DIR }}
           DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image_sha }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DO_DB_CA_CERT: ${{ secrets.DO_DB_CA_CERT }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: APP_DIR,DO_API_TOKEN,IMAGE_TAG
+          envs: APP_DIR,DO_API_TOKEN,IMAGE_TAG,DATABASE_URL,DO_DB_CA_CERT
           script: |
             set -euo pipefail
             mkdir -p "$APP_DIR"
@@ -133,4 +144,11 @@ jobs:
             fi
 
             chmod +x ./deploy.sh
-            APP_DIR="$APP_DIR" IMAGE_TAG="$IMAGE_TAG" DO_API_TOKEN="$DO_API_TOKEN" ./deploy.sh
+            if [ -n "$DO_DB_CA_CERT" ]; then
+              CA_FILE="$(mktemp)"
+              printf '%s\n' "$DO_DB_CA_CERT" > "$CA_FILE"
+              chmod 600 "$CA_FILE"
+              DB_SSL_CA="$CA_FILE" APP_DIR="$APP_DIR" IMAGE_TAG="$IMAGE_TAG" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh
+            else
+              APP_DIR="$APP_DIR" IMAGE_TAG="$IMAGE_TAG" DO_API_TOKEN="$DO_API_TOKEN" DATABASE_URL="$DATABASE_URL" ./deploy.sh
+            fi
