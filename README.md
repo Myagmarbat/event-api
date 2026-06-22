@@ -54,6 +54,7 @@ The API will be available at `http://127.0.0.1:8000`
 
 ### Using Docker
 
+
 ```bash
 docker build -t event-api .
 docker run -e DATABASE_URL="postgresql://..." -p 8000:8080 event-api
