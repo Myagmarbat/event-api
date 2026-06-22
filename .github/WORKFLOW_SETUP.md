@@ -119,7 +119,7 @@ scp docker-compose.yml deploy.sh user@server:/opt/event-api/
 1. Go to `Actions` tab
 2. Select workflow
 3. Click "Run workflow"
-4. Select branch and click "Run workflow"
+4. Select branch and click "Run workflow" 
 
 ## Viewing Results
 
