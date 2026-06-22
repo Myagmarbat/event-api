@@ -27,4 +27,7 @@ class Event(Base):
 
     def __repr__(self):
         """String representation of Event."""
-        return f"<Event(id={self.id}, event_type={self.event_type}, user_id={self.user_id})>"
+        return (
+            f"<Event(id={self.id}, event_type={self.event_type}, "
+            f"user_id={self.user_id})>"
+        )

@@ -2,98 +2,75 @@
 
 ## Overview
 
-This repository uses 6 GitHub Actions workflows for continuous integration, testing, security scanning, and deployment.
+This repository uses GitHub Actions for pull request checks, Docker image
+verification, and staged DigitalOcean deployments.
 
 ## Workflows
 
-### 1. **test.yml** - Unit & Integration Tests
-- **Trigger:** Every push to main/develop and all PRs
+### 1. **test.yml** - PR Checks
+- **Trigger:** Pull requests and pushes to main
 - **What it does:**
-  - Installs Python 3.13 and dependencies
-  - Runs unit tests (tests/unit/)
-  - Runs integration tests with PostgreSQL (tests/integration/)
-  - Generates code coverage report
-  - Uploads coverage to Codecov
+  - Runs Ruff
+  - Runs Flake8
+  - Runs unit tests in `tests/unit/`
 - **No secrets required**
 
-### 2. **lint.yml** - Code Quality Checks
-- **Trigger:** Every push to main/develop and all PRs
-- **What it does:**
-  - Checks code formatting with Black
-  - Validates import sorting with isort
-  - Lints with flake8
-  - Reports any style violations
-- **No secrets required**
-
-### 3. **build.yml** - Docker Image Build
-- **Trigger:** Every push to main/develop and all PRs
+### 2. **build.yml** - Docker Image Build
+- **Trigger:** Pull requests and pushes to main
 - **What it does:**
   - Sets up Docker Buildx
   - Builds Docker image
-  - Uses GitHub Actions cache for faster builds
   - Tags with commit SHA
-- **No secrets required** (doesn't push to registry)
+- **No secrets required** because it does not push
 
-### 4. **deploy.yml** - Full Deployment Pipeline
-- **Trigger:** Pushes to main branch only (manual trigger via `workflow_dispatch`)
+### 3. **deploy.yml** - Stage and Production Deployment
+- **Trigger:** Pushes to main and manual `workflow_dispatch`
 - **What it does:**
-  1. Runs full test suite
-  2. Builds and pushes Docker image to Docker Hub
-  3. SSHes into production server
-  4. Pulls latest image and restarts services
+  1. Builds and pushes Docker image to DigitalOcean Container Registry
+  2. Deploys the image SHA to the stage Droplet
+  3. Runs integration checks against the stage URL
+  4. Waits for GitHub Environment approval on `production`
+  5. Deploys the same image SHA to the production Droplet
 - **Secrets required:**
-  - `DOCKER_USERNAME` - Docker Hub username
-  - `DOCKER_PASSWORD` - Docker Hub access token
-  - `DEPLOY_HOST` - Production server hostname/IP
-  - `DEPLOY_USER` - SSH user for production
-  - `DEPLOY_SSH_KEY` - Private SSH key for authentication
-
-### 5. **security.yml** - Security Scanning
-- **Trigger:** 
-  - Every push to main/develop and all PRs
-  - Weekly schedule (Sundays at midnight UTC)
-- **What it does:**
-  - Runs Bandit for Python security issues
-  - Checks dependencies with Safety
-  - Scans filesystem with Trivy
-  - Uploads SARIF report to GitHub Security tab
-- **No secrets required**
-
-### 6. **performance.yml** - Performance Benchmarks
-- **Trigger:**
-  - Pushes to main and all PRs
-  - Daily schedule (2 AM UTC)
-- **What it does:**
-  - Runs performance benchmark tests
-  - Generates JSON report
-  - Uploads artifacts for analysis
-- **No secrets required**
+  - Repository: `DOCR_REGISTRY`, `DO_API_TOKEN`
+  - `stage` environment: `SSH_HOST`, `SSH_USER`, `SSH_KEY`, `APP_DIR`,
+    `DATABASE_URL`, `STAGE_BASE_URL`
+  - `production` environment: `SSH_HOST`, `SSH_USER`, `SSH_KEY`, `APP_DIR`,
+    `DATABASE_URL`
 
 ## Setup Instructions
 
-### Step 1: Add GitHub Secrets (Required for Deploy)
+### Step 1: Add Repository Secrets
 
-Only needed if you plan to use the deploy workflow:
-
-1. Go to: `Settings > Secrets and variables > Actions`
-2. Click "New repository secret"
-3. Add the following secrets:
+Go to `Settings > Secrets and variables > Actions` and add:
 
 | Secret Name | Value | Notes |
 |-------------|-------|-------|
-| `DOCKER_USERNAME` | Your Docker Hub username | e.g., `myusername` |
-| `DOCKER_PASSWORD` | Docker Hub access token | Create at docker.com/settings/security |
-| `DEPLOY_HOST` | Production server IP/hostname | e.g., `192.168.1.100` or `prod.example.com` |
-| `DEPLOY_USER` | SSH username | e.g., `deploy` |
-| `DEPLOY_SSH_KEY` | Private SSH key | Multiline - copy entire key including `-----BEGIN PRIVATE KEY-----` |
+| `DOCR_REGISTRY` | DO Container Registry URL | e.g., `registry.digitalocean.com/my-registry` |
+| `DO_API_TOKEN` | DigitalOcean API token | Needs registry access |
 
-### Step 2: Generate Docker Hub Token
+### Step 2: Create GitHub Environments
 
-1. Go to https://hub.docker.com/settings/security
-2. Click "New Access Token"
-3. Name it (e.g., "GitHub Actions")
-4. Copy the token
-5. Add as `DOCKER_PASSWORD` secret
+Create environments named `stage` and `production`.
+
+Add these environment secrets to both:
+
+| Secret Name | Value | Notes |
+|-------------|-------|-------|
+| `SSH_HOST` | Droplet IP/hostname | Environment-specific |
+| `SSH_USER` | SSH username | e.g., `deploy` |
+| `SSH_KEY` | Private SSH key | Multiline private key |
+| `APP_DIR` | App directory | e.g., `/opt/event-api` |
+| `DATABASE_URL` | Managed Postgres URL | Environment-specific |
+
+Add this only to `stage`:
+
+| Secret Name | Value | Notes |
+|-------------|-------|-------|
+| `STAGE_BASE_URL` | Public stage API URL | e.g., `https://stage-api.example.com` |
+
+Configure required reviewers on the `production` environment for manual
+approval.
 
 ### Step 3: Generate SSH Key for Deployment
 
@@ -106,45 +83,37 @@ ssh-keygen -t rsa -b 4096 -f ~/.ssh/github_deploy -N ""
 # Copy public key to production server
 ssh-copy-id -i ~/.ssh/github_deploy.pub user@production-server
 
-# Add private key as DEPLOY_SSH_KEY secret
+# Add private key as SSH_KEY secret
 cat ~/.ssh/github_deploy
 # Copy entire output and paste into GitHub secret
 ```
 
-### Step 4: Configure Production Server
+### Step 4: Configure Each Droplet
 
-On your production server:
+On each server:
 
 ```bash
 # Create app directory
-sudo mkdir -p /app/event-api
-sudo chown $USER:$USER /app/event-api
+sudo mkdir -p /opt/event-api
+sudo chown $USER:$USER /opt/event-api
 
-# Clone repository
-cd /app/event-api
-git clone https://github.com/Myagmarbat/event-api.git .
+# Copy deployment files from this repository
+scp docker-compose.yml deploy.sh user@server:/opt/event-api/
 
-# Copy and configure environment
-cp .env.example .env
-# Edit .env with production values
-nano .env
-
-# Start services
-docker-compose up -d
+# Do not create /opt/event-api/.env. The deploy workflow passes GitHub
+# Environment secrets directly to deploy.sh and docker compose.
 ```
 
 ## Workflow Triggers
 
 ### Automatic Triggers
 
-- **test.yml** & **lint.yml**: Every push/PR
-- **security.yml**: Every push/PR + Weekly Sunday midnight
-- **performance.yml**: Main branch + Daily 2 AM UTC
+- **test.yml** and **build.yml**: Pull requests and pushes to main
 - **deploy.yml**: Main branch pushes only
 
 ### Manual Triggers
 
-All workflows support manual trigger via "Actions" tab:
+`deploy.yml` supports manual trigger via the "Actions" tab:
 
 1. Go to `Actions` tab
 2. Select workflow
@@ -159,20 +128,10 @@ All workflows support manual trigger via "Actions" tab:
 - View logs in "Run tests" step
 - Download test artifacts
 
-### Security Reports
-- Go to `Security > Code scanning`
-- View Trivy results in SARIF format
-- Review Bandit reports in artifacts
-
-### Coverage Reports
-- Go to https://codecov.io/
-- Sign in with GitHub
-- View coverage trends
-
 ### Deployment Logs
 - Go to `Actions` tab
 - Click deploy.yml workflow run
-- View "Deploy to production" step logs
+- View stage, stage integration test, and production deploy logs
 
 ## Troubleshooting
 
@@ -188,7 +147,7 @@ pytest tests/ -v
 **Check secrets are set:**
 ```bash
 # In GitHub: Settings > Secrets and variables
-# Verify all 5 secrets exist
+# Verify repository secrets and environment secrets exist
 ```
 
 **Check SSH access:**
@@ -196,10 +155,10 @@ pytest tests/ -v
 ssh -i ~/.ssh/github_deploy user@production-server
 ```
 
-**Check Docker Hub token:**
+**Check DigitalOcean token and registry:**
 ```bash
-# Verify token hasn't expired
-# Regenerate if needed at docker.com/settings/security
+# Verify DO_API_TOKEN can access DOCR_REGISTRY
+doctl registry login
 ```
 
 ### Slow Builds
@@ -220,8 +179,8 @@ ssh -i ~/.ssh/github_deploy user@production-server
 1. **Test locally before pushing**
    ```bash
    pytest tests/ -v
-   black --check app/ tests/
-   flake8 app/ tests/
+   ruff check .
+   flake8 app tests --max-line-length=88 --extend-ignore=E203,W503
    ```
 
 2. **Keep secrets secure**
@@ -245,8 +204,8 @@ Add this to your README.md to show CI status:
 
 ```markdown
 ![Tests](https://github.com/Myagmarbat/event-api/actions/workflows/test.yml/badge.svg)
-![Lint](https://github.com/Myagmarbat/event-api/actions/workflows/lint.yml/badge.svg)
-![Security](https://github.com/Myagmarbat/event-api/actions/workflows/security.yml/badge.svg)
+![Build](https://github.com/Myagmarbat/event-api/actions/workflows/build.yml/badge.svg)
+![Deploy](https://github.com/Myagmarbat/event-api/actions/workflows/deploy.yml/badge.svg)
 ```
 
 ## Support

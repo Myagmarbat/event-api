@@ -1,23 +1,32 @@
 # DigitalOcean deployment
 
-This repository deploys automatically to a DigitalOcean Droplet when code lands on
-`main`.
+This repository deploys automatically through stage and production DigitalOcean
+Droplets when code lands on `main`.
 
 ## Required GitHub configuration
 
-Create a GitHub Environment named `production` and store these secrets there:
+Create these GitHub Actions repository secrets:
 
 - `DOCR_REGISTRY` - for example `registry.digitalocean.com/my-registry`
 - `DO_API_TOKEN` - DigitalOcean API token with registry access
+
+Create two GitHub Environments named `stage` and `production`. Store these
+environment secrets in both environments, with values for the matching Droplet:
+
 - `SSH_HOST` - droplet hostname or IP
 - `SSH_USER` - SSH user on the droplet
 - `SSH_KEY` - private key for the SSH user
 - `APP_DIR` - deployment directory on the droplet, for example `/opt/event-api`
-- `DATABASE_URL` - optional if you want GitHub to manage it; otherwise keep
-  `DATABASE_URL` only in the droplet `.env` file and do not add this secret
+- `DATABASE_URL` - Managed PostgreSQL connection string for that environment,
+  for example `postgresql://...:25060/event_db?sslmode=require`
 
-The workflow uses the `production` environment directly, so you can add required
-reviewers there if you want manual approval before each deployment.
+Store this additional environment secret in `stage`:
+
+- `STAGE_BASE_URL` - public base URL for the stage API, for example
+  `https://stage-api.example.com`
+
+Add required reviewers to the `production` environment to create the manual
+approval gate before production deployment.
 
 ## Droplet prerequisites
 
@@ -45,32 +54,35 @@ Install these packages on the server before the first deployment:
    ssh your-user@your-host 'chmod +x /opt/event-api/deploy.sh'
    ```
 
-3. Create `/opt/event-api/.env` on the droplet:
-
-   ```env
-   DATABASE_URL=******host:25060/event_db?sslmode=require
-   IMAGE=registry.digitalocean.com/my-registry/event-api:latest
-   ```
-
-   `docker-compose.yml` reads `DATABASE_URL` and `IMAGE` from this file. Future
-   deployments only update the `IMAGE` value; the droplet remains the source of
-   truth for `DATABASE_URL`.
+3. Do not create `/opt/event-api/.env`. The deploy workflow passes
+   `DATABASE_URL` from GitHub Environment secrets directly to `deploy.sh`, and
+   `docker-compose.yml` passes it to the container as a runtime environment
+   variable. Stage and production should use separate `DATABASE_URL` secret
+   values.
 
 ## Continuous deployment flow
 
-1. Push to `main`.
-2. GitHub Actions builds the Docker image.
-3. The workflow installs `doctl`, authenticates to DigitalOcean Container
+1. Open a pull request.
+2. GitHub Actions runs Ruff/Flake8, unit tests, and a Docker image build.
+3. Merge to `main`.
+4. GitHub Actions builds the Docker image.
+5. The workflow installs `doctl`, authenticates to DigitalOcean Container
    Registry, and pushes both `${GITHUB_SHA}` and `latest` tags.
-4. The workflow opens an SSH session to the droplet and runs `deploy.sh`.
-5. `deploy.sh` updates the `IMAGE` entry in `.env`, pulls the new image, restarts
-   the `api` service with `docker compose`, and retries `curl http://127.0.0.1/health`.
-6. If the health check never succeeds, `deploy.sh` restores the previous `.env`
-   state, restarts the old container, and exits non-zero so the workflow fails.
+6. The workflow deploys the image to the stage Droplet.
+7. GitHub Actions runs integration checks against `STAGE_BASE_URL`.
+8. The `production` environment approval gate pauses the workflow.
+9. After approval, the workflow deploys the same image SHA to the production
+   Droplet.
+10. The workflow passes GitHub Environment secrets over SSH as runtime
+    environment variables, then `deploy.sh` verifies them, pulls the new image,
+    restarts the `api` service with `docker compose`, and retries
+    `curl http://127.0.0.1/health`.
+11. If the health check never succeeds, `deploy.sh` restarts the previous image
+    and exits non-zero so the workflow fails.
 
 ## Notes
 
-- Production deploys are serialized with the workflow concurrency guard
-  `production-deploy`.
+- Main-branch deploys are serialized with the workflow concurrency guard
+  `main-deploy`.
 - The container runs `alembic upgrade head` before starting Uvicorn.
 - Port `80` on the droplet maps to port `8000` inside the container.
