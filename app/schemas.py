@@ -1,5 +1,5 @@
 """Pydantic schemas for request/response validation."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from typing import Optional
 
@@ -38,11 +38,7 @@ class EventOut(BaseModel):
     event_type: str = Field(..., description="Type of event")
     user_id: str = Field(..., description="User ID")
     created_at: datetime = Field(..., description="Event creation timestamp")
-
-    class Config:
-        """Pydantic config."""
-        from_attributes = True
-
+    model_config = ConfigDict(from_attributes=True)
 
 class Event(EventCreate):
     """Complete event schema combining creation and output fields."""
