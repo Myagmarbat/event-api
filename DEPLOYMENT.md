@@ -15,10 +15,11 @@ environment secrets in both environments, with values for the matching Droplet:
 
 - `SSH_HOST` - droplet hostname or IP
 - `SSH_USER` - SSH user on the droplet
-- `SSH_KEY` - private key for the SSH user
+- `SSH_KEY` - private key for the SSH user, use a separate key per environment
 - `APP_DIR` - deployment directory on the droplet, for example `/opt/event-api`
 - `DATABASE_URL` - Managed PostgreSQL connection string for that environment,
-  for example `postgresql://...:25060/event_db?sslmode=require`
+  for example `postgresql://...:25060/defaultdb?sslmode=require`
+- `DO_DB_CA_CERT` - DigitalOcean Managed PostgreSQL CA certificate PEM text
 
 Store this additional environment secret in `stage`:
 
@@ -54,11 +55,12 @@ Install these packages on the server before the first deployment:
    ssh your-user@your-host 'chmod +x /opt/event-api/deploy.sh'
    ```
 
-3. Do not create `/opt/event-api/.env`. The deploy workflow passes
-   `DATABASE_URL` from GitHub Environment secrets directly to `deploy.sh`, and
-   `docker-compose.yml` passes it to the container as a runtime environment
-   variable. Stage and production should use separate `DATABASE_URL` secret
-   values.
+3. Do not create `/opt/event-api/.env`. The deploy workflow copies
+   `docker-compose.yml` and `deploy.sh` to the Droplet, then passes
+   `DATABASE_URL` and `DO_DB_CA_CERT` from GitHub Environment secrets directly
+   to `deploy.sh`. `docker-compose.yml` passes both values to the container as
+   runtime environment variables. Stage and production should use separate
+   `DATABASE_URL` values.
 
 ## Continuous deployment flow
 
@@ -73,9 +75,10 @@ Install these packages on the server before the first deployment:
 8. The `production` environment approval gate pauses the workflow.
 9. After approval, the workflow deploys the same image SHA to the production
    Droplet.
-10. The workflow passes GitHub Environment secrets over SSH as runtime
-    environment variables, then `deploy.sh` verifies them, pulls the new image,
-    restarts the `api` service with `docker compose`, and retries
+10. The workflow syncs `docker-compose.yml` and `deploy.sh` to the Droplet,
+    passes GitHub Environment secrets over SSH as runtime environment
+    variables, then `deploy.sh` verifies them, pulls the new image, restarts
+    the `api` service with `docker compose`, and retries
     `curl http://127.0.0.1/health`.
 11. If the health check never succeeds, `deploy.sh` restarts the previous image
     and exits non-zero so the workflow fails.

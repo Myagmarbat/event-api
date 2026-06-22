@@ -34,9 +34,9 @@ verification, and staged DigitalOcean deployments.
 - **Secrets required:**
   - Repository: `DOCR_REGISTRY`, `DO_API_TOKEN`
   - `stage` environment: `SSH_HOST`, `SSH_USER`, `SSH_KEY`, `APP_DIR`,
-    `DATABASE_URL`, `STAGE_BASE_URL`
+    `DATABASE_URL`, `DO_DB_CA_CERT`, `STAGE_BASE_URL`
   - `production` environment: `SSH_HOST`, `SSH_USER`, `SSH_KEY`, `APP_DIR`,
-    `DATABASE_URL`
+    `DATABASE_URL`, `DO_DB_CA_CERT`
 
 ## Setup Instructions
 
@@ -59,9 +59,10 @@ Add these environment secrets to both:
 |-------------|-------|-------|
 | `SSH_HOST` | Droplet IP/hostname | Environment-specific |
 | `SSH_USER` | SSH username | e.g., `deploy` |
-| `SSH_KEY` | Private SSH key | Multiline private key |
+| `SSH_KEY` | Private SSH key | Use a separate key per environment |
 | `APP_DIR` | App directory | e.g., `/opt/event-api` |
 | `DATABASE_URL` | Managed Postgres URL | Environment-specific |
+| `DO_DB_CA_CERT` | DigitalOcean CA PEM | Multiline certificate text |
 
 Add this only to `stage`:
 
@@ -83,7 +84,7 @@ ssh-keygen -t rsa -b 4096 -f ~/.ssh/github_deploy -N ""
 # Copy public key to production server
 ssh-copy-id -i ~/.ssh/github_deploy.pub user@production-server
 
-# Add private key as SSH_KEY secret
+# Add the private key as the SSH_KEY secret in the matching environment
 cat ~/.ssh/github_deploy
 # Copy entire output and paste into GitHub secret
 ```

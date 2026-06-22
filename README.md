@@ -40,6 +40,7 @@ pip install -r requirements.txt
 ```bash
 export DATABASE_URL="postgresql://user:password@localhost:5432/event_db"
 export APP_NAME="event-api"
+export DB_SSL_CA="/path/to/do-ca-cert.crt"  # optional for DigitalOcean Managed PostgreSQL
 
 ```
 
@@ -59,7 +60,11 @@ The API will be available at `http://127.0.0.1:8000`
 
 ```bash
 docker build -t event-api .
-docker run -e DATABASE_URL="postgresql://..." -p 8000:8000 event-api
+docker run \
+  -e DATABASE_URL="postgresql://..." \
+  -e DB_SSL_CA="/path/to/do-ca-cert.crt" \
+  -p 8000:8000 \
+  event-api
 ```
 
 ## API Endpoints
@@ -111,6 +116,7 @@ The API returns appropriate HTTP status codes:
 
 - `DATABASE_URL` (required): PostgreSQL connection string
 - `APP_NAME` (optional): Application name (default: "event-api")
+- `DB_SSL_CA` (optional): Path to the DigitalOcean PostgreSQL CA certificate
 - `IMAGE` (deployment only): container image reference used by `docker compose`
 
 ## Deployment
