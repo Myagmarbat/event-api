@@ -2,3 +2,13 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Environment variables - never commit secrets
+.env
+.env.*
+!.env.example
+
+# Database certificates - never commit
+certs/
+
+.DS_Store

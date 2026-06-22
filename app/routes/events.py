@@ -7,6 +7,7 @@ from app import models, schemas
 
 router = APIRouter()
 
+
 @router.get("/events", response_model=schemas.EventOut, status_code=201)
 def create_event(event: schemas.EventCreate, db: Session = Depends(get_db)):
     db_event = models.Event(
@@ -18,6 +19,7 @@ def create_event(event: schemas.EventCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_event)
     return db_event
+
 
 @router.get("/events/{event_id}")
 def get_event(event_id: str, db: Session = Depends(get_db)):
