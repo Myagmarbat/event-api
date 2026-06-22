@@ -3,11 +3,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is required")
+def get_database_url():
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        raise RuntimeError("DATABASE_URL environment variable is required")
+    return url
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(get_database_url())
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
