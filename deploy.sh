@@ -5,10 +5,10 @@ APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-/dev/null}"
 SERVICE_NAME="${SERVICE_NAME:-api}"
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1/health}"
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:80/health}"
 HEALTH_RETRIES="${HEALTH_RETRIES:-30}"
 HEALTH_SLEEP_SECONDS="${HEALTH_SLEEP_SECONDS:-3}"
-TARGET_IMAGE="${IMAGE_TAG:-${IMAGE:-}}"
+TARGET_IMAGE="${1:-${IMAGE_TAG:-${IMAGE:-}}}"
 PREVIOUS_IMAGE=""
 
 require_command() {
