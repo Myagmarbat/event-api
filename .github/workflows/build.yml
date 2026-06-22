@@ -1,29 +1,60 @@
-name: Build Docker Image
+name: Run Tests
 
 on:
   push:
-    branches: [main, develop]
   pull_request:
-    branches: [main, develop]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d test_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+      SECRET_KEY: test-secret-key
+      JWT_SECRET_KEY: test-jwt-secret-key
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          context: .
-          push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: event-api:${{ github.sha }}
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 -U postgres -d test_db && break
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Run unit tests
+        run: pytest tests/unit/ -v
+
+      - name: Run integration tests
+        run: pytest tests/integration/ -v
+
+      - name: Run tests with coverage
+        run: pytest --cov=app tests/
