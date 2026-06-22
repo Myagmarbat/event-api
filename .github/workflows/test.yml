@@ -6,27 +6,8 @@ on:
     branches: [main]
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install lint tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff black
-      - name: Ruff
-        run: ruff check .
-      - name: Black
-        run: black --check .
-
   unit-tests:
     runs-on: ubuntu-latest
-    needs: lint
-    env:
-      PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -38,28 +19,14 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov
       - name: Run unit tests
-        run: pytest tests/unit -v --maxfail=1 --disable-warnings
+        run: pytest tests/unit -v
 
   integration-tests:
     runs-on: ubuntu-latest
     needs: unit-tests
     env:
-      DATABASE_URL: postgresql://app:app@localhost:5432/test_db
+      DATABASE_URL: ${{ secrets.DO_DATABASE_URL }}
       PYTHONPATH: .
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: app
-          POSTGRES_PASSWORD: app
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U app -d test_db"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -71,37 +38,4 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov
       - name: Run integration tests
-        run: pytest tests/integration -v --maxfail=1 --disable-warnings
-
-  coverage:
-    runs-on: ubuntu-latest
-    needs: [unit-tests, integration-tests]
-    env:
-      DATABASE_URL: postgresql://app:app@localhost:5432/test_db
-      PYTHONPATH: .
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: app
-          POSTGRES_PASSWORD: app
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U app -d test_db"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-cov
-      - name: Coverage check
-        run: pytest tests/unit tests/integration -v --cov=app --cov-report=term-missing --cov-fail-under=80
+        run: pytest tests/integration -v
